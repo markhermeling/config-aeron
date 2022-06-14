@@ -1,0 +1,76 @@
+pipeline {
+   
+   agent {
+        docker {
+            image 'canuckmh/codesonar-j-src:7.0p0'
+            registryUrl "https://registry.hub.docker.com"
+            registryCredentialsId "dockermh"
+            args  '--net="world_world-net" -v project-storage:/home/codesonar/projects'
+        }
+    }
+
+    stages {
+
+        stage('Build') {
+            steps {
+                
+                checkout scm: [$class: 'GitSCM', 
+                    userRemoteConfigs: [[url: 'https://github.com/real-logic/aeron']],
+                    extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: 'aeron']],
+                    branches: [[name: "*/master"]]], poll: true
+                checkout scm: [$class: 'GitSCM', 
+                    userRemoteConfigs: [[credentialsId: 'Github', url: 'https://github.com/markhermeling/config-aeron']],
+                    extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: 'config-aeron']],
+                    branches: [[name: '*/main']]], poll: false
+                sh "cd aeron; ./gradlew assemble"
+                
+                sh '''if [ ! -d codesonar_aeron ]; 
+	                    then mkdir codesonar_aeron 
+                    fi'''
+    
+                sh '''cd aeron ; COMMIT_ID=$(git rev-parse --verify HEAD);\
+                    /opt/codesonar/codesonar/bin/codesonar analyze -clean -foreground \
+                    ../codesonar_aeron/Aeron-master \
+                    http://world_hub_1:7340 \
+                   -project "Aeron/Aeron-master" \
+                   -name "hash:$COMMIT_ID" \
+                    /opt/codesonar/codesonar/bin/cs-java-scan \
+                    -include-artifacts aeron-agent/build/libs/aeron-agent-1.39.0-SNAPSHOT.jar \
+                    -include-sources */src/main/java/**/*.java \
+                    -include-sources */build/generated-src/**/*.java'''
+                    
+                
+                sh "cp -R codesonar_aeron /home/codesonar/projects/"
+                sh "touch /home/codesonar/projects/codesonar_aeron/Aeron-master.done"
+                sh "chown -R 1000.1000 /home/codesonar/projects/codesonar_aeron"
+                
+                
+                             script {
+                   def ret = sh(
+                     returnStatus: true, 
+                  script: '''
+                      unset PYTHONHOME
+                      unset PYTHONPATH
+                
+                       /opt/codesonar/codesonar/bin/codesonar dump_warnings.py \
+                        --analysis-id `cat codesonar_openssl/Aeron-master.prj_files/aid.txt` --visible-warnings 14 \
+                        --csv --hub http://world_hub_1:7340 | sed -n '2 p' | cut -f 1 -d, > score.txt
+                
+                      if [ $(cat score.txt) -ge 50 ] ; then
+                           return 2
+                      fi
+                       ''')
+                
+                   if (ret == 2 ) {
+                      currentBuild.result = 'UNSTABLE'
+                   }
+                   else if (ret != 0) {
+                      currentBuild.result = 'FAILURE'
+                   }
+                 }
+         
+
+            }
+        }
+    }
+}
