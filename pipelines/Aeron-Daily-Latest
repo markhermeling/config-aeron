@@ -34,6 +34,7 @@ pipeline {
                     http://world_hub_1:7340 \
                    -project "Aeron/Aeron-master" \
                    -name "hash:$COMMIT_ID" \
+		   -conf-file ../config-aeron/aeron.conf \
                     /opt/codesonar/codesonar/bin/cs-java-scan \
                     -include-artifacts aeron-agent/build/libs/aeron-agent-1.39.0-SNAPSHOT.jar \
                     -include-sources */src/main/java/**/*.java \
