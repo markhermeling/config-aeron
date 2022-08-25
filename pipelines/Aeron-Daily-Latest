@@ -36,7 +36,7 @@ pipeline {
                    -name "hash:$COMMIT_ID" \
 		   -conf-file ../config-aeron/aeron.conf \
                     /opt/codesonar/codesonar/bin/cs-java-scan \
-                    -include-artifacts aeron-agent/build/libs/aeron-agent-1.39.0-SNAPSHOT.jar \
+                    -include-artifacts aeron-agent/build/libs/aeron-agent-1.40.0-SNAPSHOT.jar \
                     -include-sources */src/main/java/**/*.java \
                     -include-sources */build/generated-src/**/*.java'''
                     
